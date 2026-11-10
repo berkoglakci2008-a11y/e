@@ -1,0 +1,27 @@
+{
+ "weights": {
+  "question": 2,
+  "exclaim": 2,
+  "surprise": 3,
+  "humor": 3,
+  "conflict": 3,
+  "emotion": 3,
+  "support": 2,
+  "critical": 3,
+  "repeat": 1,
+  "silence": 1,
+  "density": 2,
+  "speaker": 1,
+  "laughter_tag": 4,
+  "applause_tag": 3
+ },
+ "min_gap_seconds": 20,
+ "min_raw_score": 3.0,
+ "llm": {
+  "enabled": true,
+  "url": "http://127.0.0.1:11434",
+  "model": "qwen2.5:7b",
+  "timeout": 90
+ },
+ "radar": {"enabled": true, "channels": ["@emirichcs", "@BerkayIpekci"], "poll_seconds": 600, "first_delay_minutes": 45, "followup_hours": 24, "daily_quota_budget": 8000, "max_threads": 1000}
+}
