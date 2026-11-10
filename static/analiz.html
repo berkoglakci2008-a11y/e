@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yorum İstihbaratı - Analiz</title>
+    
+    <!-- Vercel Speed Insights -->
+    <script>
+      window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
+    
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        button {
+            background-color: #0070f3;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0051cc;
+        }
+        .checkbox-group {
+            margin: 10px 0;
+        }
+        .checkbox-group label {
+            display: inline;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            display: none;
+        }
+        .error {
+            background-color: #ffe0e0;
+            color: #c00;
+        }
+        .success {
+            background-color: #e0ffe0;
+            color: #060;
+        }
+        .results {
+            margin-top: 30px;
+            display: none;
+        }
+        .comment-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background-color: #fafafa;
+        }
+        .links {
+            margin-top: 20px;
+        }
+        .links a {
+            color: #0070f3;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Yorum İstihbaratı</h1>
+        <p>YouTube videolarının yorumlarını analiz edin ve detaylı raporlar alın.</p>
+        
+        <div class="input-group">
+            <label for="videoUrl">Video URL:</label>
+            <input type="text" id="videoUrl" placeholder="https://www.youtube.com/watch?v=...">
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="includeReplies" checked>
+                <label for="includeReplies">Yanıtları dahil et</label>
+            </div>
+            
+            <button onclick="analyzeComments()">Analiz Başlat</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div id="results" class="results">
+            <h2>Sonuçlar</h2>
+            <div id="resultsContent"></div>
+        </div>
+        
+        <div class="links">
+            <a href="/">Ana Sayfa</a>
+            <a href="/api/history">Geçmiş</a>
+        </div>
+    </div>
+    
+    <script>
+        async function analyzeComments() {
+            const url = document.getElementById('videoUrl').value;
+            const includeReplies = document.getElementById('includeReplies').checked;
+            const status = document.getElementById('status');
+            
+            if (!url) {
+                showStatus('Lütfen bir video URL\'si girin', 'error');
+                return;
+            }
+            
+            status.style.display = 'block';
+            status.className = 'status';
+            status.textContent = 'Analiz başlatılıyor...';
+            
+            try {
+                const response = await fetch('/api/ci/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, include_replies: includeReplies })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Analiz başlatıldı! Job ID: ' + data.job, 'success');
+                    pollStatus(data.job, data.vid);
+                } else {
+                    showStatus('Hata: ' + (data.error || 'Bilinmeyen hata'), 'error');
+                }
+            } catch (error) {
+                showStatus('Bağlantı hatası: ' + error.message, 'error');
+            }
+        }
+        
+        async function pollStatus(jobId, videoId) {
+            const status = document.getElementById('status');
+            
+            const checkStatus = async () => {
+                try {
+                    const response = await fetch('/api/ci/status/' + jobId);
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        showStatus('Hata: ' + data.error, 'error');
+                        return;
+                    }
+                    
+                    if (data.done) {
+                        showStatus('Analiz tamamlandı!', 'success');
+                        loadResults(videoId);
+                    } else {
+                        status.textContent = data.stage + ' - %' + Math.round(data.progress * 100);
+                        setTimeout(checkStatus, 1000);
+                    }
+                } catch (error) {
+                    showStatus('Durum kontrolü hatası: ' + error.message, 'error');
+                }
+            };
+            
+            checkStatus();
+        }
+        
+        async function loadResults(videoId) {
+            try {
+                const response = await fetch('/api/ci/result/' + videoId);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    showStatus('Sonuçlar yüklenemedi: ' + (data.error || 'Bilinmeyen hata'), 'error');
+                }
+            } catch (error) {
+                showStatus('Sonuç yükleme hatası: ' + error.message, 'error');
+            }
+        }
+        
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const contentDiv = document.getElementById('resultsContent');
+            
+            let html = '<div class="summary">';
+            html += '<p><strong>Video:</strong> ' + (data.video_title || data.vid) + '</p>';
+            html += '<p><strong>Toplam Yorum:</strong> ' + (data.comment_count || 0) + '</p>';
+            html += '</div>';
+            
+            contentDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.textContent = message;
+            status.className = 'status ' + (type || '');
+        }
+    </script>
+</body>
+</html>
